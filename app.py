@@ -47,8 +47,7 @@ async def root():
 
 
 @app.post("/slack/events")
-async def slack_events(request: Request, x_slack_signature: Optional[str] = Header(None), 
-                      x_slack_request_timestamp: Optional[str] = Header(None)):
+async def slack_events(request: Request):
     """
     Slackイベントを受け取るエンドポイント
     URL Verificationとメッセージイベントを処理
@@ -58,6 +57,12 @@ async def slack_events(request: Request, x_slack_signature: Optional[str] = Head
         body = await request.body()
         body_str = body.decode('utf-8')
         logger.info(f"リクエストボディ: {body_str[:200]}...")
+        
+        # ヘッダーから署名情報を取得
+        x_slack_signature = request.headers.get("X-Slack-Signature")
+        x_slack_request_timestamp = request.headers.get("X-Slack-Request-Timestamp")
+        
+        logger.info(f"署名ヘッダー - Signature: {x_slack_signature}, Timestamp: {x_slack_request_timestamp}")
         
         # まずデータをパースしてURL検証かどうかを確認
         try:
@@ -86,7 +91,7 @@ async def slack_events(request: Request, x_slack_signature: Optional[str] = Head
                 raise HTTPException(status_code=401, detail="Invalid signature")
             logger.info("署名検証成功")
         else:
-            logger.warning("署名ヘッダーがありません")
+            logger.warning(f"署名ヘッダーがありません - Signature: {x_slack_signature}, Timestamp: {x_slack_request_timestamp}")
         
         # イベントの処理
         if data.get("type") == "event_callback":
