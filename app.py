@@ -31,6 +31,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # クライアントの初期化
 slack_client = WebClient(token=SLACK_BOT_TOKEN)
+# OpenAIクライアントの初期化（proxies引数を明示的に除外）
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
 signature_verifier = SignatureVerifier(signing_secret=SLACK_SIGNING_SECRET)
 
