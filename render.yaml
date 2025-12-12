@@ -2,7 +2,7 @@ services:
   - type: web
     name: slack-ai-chatbot
     env: python
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
     startCommand: python app.py
     envVars:
       - key: SLACK_BOT_TOKEN
