@@ -85,8 +85,9 @@ async def slack_events(request: Request):
                 raise HTTPException(status_code=400, detail="Missing challenge")
         
         # URL検証以外の場合は署名検証を実行
+        # is_valid()の引数順序は: body, timestamp, signature
         if x_slack_signature and x_slack_request_timestamp:
-            if not signature_verifier.is_valid(body, x_slack_signature, x_slack_request_timestamp):
+            if not signature_verifier.is_valid(body, x_slack_request_timestamp, x_slack_signature):
                 logger.warning("無効な署名")
                 raise HTTPException(status_code=401, detail="Invalid signature")
             logger.info("署名検証成功")
