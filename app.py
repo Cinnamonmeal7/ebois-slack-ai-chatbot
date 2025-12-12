@@ -90,11 +90,13 @@ async def slack_events(request: Request, x_slack_signature: Optional[str] = Head
 async def handle_message(event: dict):
     """
     メッセージイベントを処理し、OpenAI APIを呼び出してSlackに返信
+    スレッドで返信する
     """
     try:
         channel = event.get("channel")
         text = event.get("text", "")
         user = event.get("user")
+        ts = event.get("ts")  # 元のメッセージのタイムスタンプ
         
         # メンションの場合はメンション部分を削除
         if event.get("type") == "app_mention":
@@ -110,13 +112,14 @@ async def handle_message(event: dict):
         # OpenAI APIを呼び出し
         response_text = await call_openai(text, user)
         
-        # Slackに返信
+        # Slackにスレッドで返信
         slack_client.chat_postMessage(
             channel=channel,
-            text=response_text
+            text=response_text,
+            thread_ts=ts  # 元のメッセージのタイムスタンプを指定してスレッド返信
         )
         
-        logger.info("返信を送信しました")
+        logger.info("スレッドで返信を送信しました")
     
     except SlackApiError as e:
         logger.error(f"Slack API エラー: {e.response['error']}")
