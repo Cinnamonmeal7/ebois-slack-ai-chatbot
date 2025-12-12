@@ -76,8 +76,8 @@ async def slack_events(request: Request, x_slack_signature: Optional[str] = Head
             if event.get("bot_id"):
                 return JSONResponse(content={"status": "ok"})
             
-            # メンションまたはDMの処理
-            if event.get("type") == "app_mention" or event.get("type") == "message":
+            # メンションのみを処理（メンションされた時だけOpenAI APIを呼び出す）
+            if event.get("type") == "app_mention":
                 await handle_message(event)
         
         return JSONResponse(content={"status": "ok"})
