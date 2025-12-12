@@ -39,6 +39,9 @@ signature_verifier = SignatureVerifier(signing_secret=SLACK_SIGNING_SECRET)
 if not all([SLACK_BOT_TOKEN, SLACK_SIGNING_SECRET, OPENAI_API_KEY]):
     logger.warning("必要な環境変数が設定されていません。本番環境ではエラーになります。")
 
+# 処理済みイベントIDを記録（重複処理を防ぐ）
+processed_events = set()
+
 
 @app.get("/")
 async def root():
@@ -97,7 +100,22 @@ async def slack_events(request: Request):
         # イベントの処理
         if data.get("type") == "event_callback":
             event = data.get("event", {})
-            logger.info(f"イベントタイプ: {event.get('type')}, チャンネル: {event.get('channel')}")
+            event_id = data.get("event_id")  # SlackのイベントID
+            
+            # 重複イベントのチェック
+            if event_id:
+                if event_id in processed_events:
+                    logger.info(f"重複イベントを無視: {event_id}")
+                    return JSONResponse(content={"status": "ok"})
+                processed_events.add(event_id)
+                # メモリを節約するため、古いイベントIDを削除（1000件まで保持）
+                if len(processed_events) > 1000:
+                    # 古いイベントIDを削除（FIFO方式）
+                    oldest_ids = list(processed_events)[:100]
+                    for old_id in oldest_ids:
+                        processed_events.discard(old_id)
+            
+            logger.info(f"イベントタイプ: {event.get('type')}, チャンネル: {event.get('channel')}, イベントID: {event_id}")
             
             # ボット自身のメッセージは無視
             if event.get("bot_id"):
