@@ -54,37 +54,50 @@ async def slack_events(request: Request, x_slack_signature: Optional[str] = Head
     URL Verificationとメッセージイベントを処理
     """
     try:
+        logger.info("Slackイベントを受信しました")
         body = await request.body()
         body_str = body.decode('utf-8')
+        logger.info(f"リクエストボディ: {body_str[:200]}...")
         
         # 署名検証（本番環境では重要）
         if x_slack_signature and x_slack_request_timestamp:
             if not signature_verifier.is_valid(body, x_slack_signature, x_slack_request_timestamp):
                 logger.warning("無効な署名")
                 raise HTTPException(status_code=401, detail="Invalid signature")
+            logger.info("署名検証成功")
+        else:
+            logger.warning("署名ヘッダーがありません（開発環境の可能性）")
         
         data = json.loads(body_str)
+        logger.info(f"イベントタイプ: {data.get('type')}")
         
         # URL Verification（Slackアプリの設定時に必要）
         if data.get("type") == "url_verification":
-            return JSONResponse(content={"challenge": data.get("challenge")})
+            logger.info("URL Verificationリクエストを受信")
+            challenge = data.get("challenge")
+            return JSONResponse(content={"challenge": challenge})
         
         # イベントの処理
         if data.get("type") == "event_callback":
             event = data.get("event", {})
+            logger.info(f"イベントタイプ: {event.get('type')}, チャンネル: {event.get('channel')}")
             
             # ボット自身のメッセージは無視
             if event.get("bot_id"):
+                logger.info("ボット自身のメッセージを無視")
                 return JSONResponse(content={"status": "ok"})
             
             # メンションのみを処理（メンションされた時だけOpenAI APIを呼び出す）
             if event.get("type") == "app_mention":
+                logger.info("メンションイベントを処理します")
                 await handle_message(event)
+            else:
+                logger.info(f"メンション以外のイベント: {event.get('type')}")
         
         return JSONResponse(content={"status": "ok"})
     
     except Exception as e:
-        logger.error(f"エラーが発生しました: {str(e)}")
+        logger.error(f"エラーが発生しました: {str(e)}", exc_info=True)
         return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
 
 
