@@ -59,23 +59,34 @@ async def slack_events(request: Request, x_slack_signature: Optional[str] = Head
         body_str = body.decode('utf-8')
         logger.info(f"リクエストボディ: {body_str[:200]}...")
         
-        # 署名検証（本番環境では重要）
+        # まずデータをパースしてURL検証かどうかを確認
+        try:
+            data = json.loads(body_str)
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON解析エラー: {str(e)}")
+            raise HTTPException(status_code=400, detail="Invalid JSON")
+        
+        logger.info(f"イベントタイプ: {data.get('type')}")
+        
+        # URL Verification（Slackアプリの設定時に必要）
+        # URL検証の場合は署名検証をスキップ
+        if data.get("type") == "url_verification":
+            logger.info("URL Verificationリクエストを受信")
+            challenge = data.get("challenge")
+            if challenge:
+                return JSONResponse(content={"challenge": challenge})
+            else:
+                logger.error("challengeが見つかりません")
+                raise HTTPException(status_code=400, detail="Missing challenge")
+        
+        # URL検証以外の場合は署名検証を実行
         if x_slack_signature and x_slack_request_timestamp:
             if not signature_verifier.is_valid(body, x_slack_signature, x_slack_request_timestamp):
                 logger.warning("無効な署名")
                 raise HTTPException(status_code=401, detail="Invalid signature")
             logger.info("署名検証成功")
         else:
-            logger.warning("署名ヘッダーがありません（開発環境の可能性）")
-        
-        data = json.loads(body_str)
-        logger.info(f"イベントタイプ: {data.get('type')}")
-        
-        # URL Verification（Slackアプリの設定時に必要）
-        if data.get("type") == "url_verification":
-            logger.info("URL Verificationリクエストを受信")
-            challenge = data.get("challenge")
-            return JSONResponse(content={"challenge": challenge})
+            logger.warning("署名ヘッダーがありません")
         
         # イベントの処理
         if data.get("type") == "event_callback":
@@ -96,6 +107,8 @@ async def slack_events(request: Request, x_slack_signature: Optional[str] = Head
         
         return JSONResponse(content={"status": "ok"})
     
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"エラーが発生しました: {str(e)}", exc_info=True)
         return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
